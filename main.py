@@ -2,6 +2,7 @@ import asyncio
 import configparser
 import csv
 import json
+import os
 
 from telethon.sync import TelegramClient
 from telethon import connection
@@ -15,16 +16,17 @@ from telethon.tl.types import ChannelParticipantsSearch
 
 # класс для работы с сообщениями
 from telethon.tl.functions.messages import GetHistoryRequest
-
-# Считываем учетные данные
-
+#для работы с полем about
+from telethon import functions, types
+from dotenv import load_dotenv
+load_dotenv()
 
 # Присваиваем значения внутренним переменным
 # Получить их можно тут https://my.telegram.org/apps
-api_id = 19469879
-api_hash = 'e8b8387007ae5058d2b363024dfb165e'
+api_id = os.getenv('api_id')
+api_hash = os.getenv('api_hash')
 # username = 'Parsing_group'
-phone = '+79877521455'
+phone = os.getenv('phone')
 # Создадим объект клиента Telegram API:
 client = TelegramClient(phone, api_id, api_hash)
 client.start()
@@ -39,8 +41,7 @@ async def dump_all_participants(channel):
     filter_user = ChannelParticipantsSearch('')
 
     while True:
-        participants = await client(GetParticipantsRequest(channel,
-                                                           filter_user, offset_user, limit_user, hash=0))
+        participants = await client(GetParticipantsRequest(channel, filter_user, 0, limit_user, hash=0))
         if not participants.users:
             break
         all_participants.extend(participants.users)
@@ -49,24 +50,27 @@ async def dump_all_participants(channel):
     all_users_details = []  # список словарей с интересующими параметрами участников канала
 
     for participant in all_participants:
-
+        #result_about = client(functions.users.GetFullUserRequest(participant.id))
+        #print(result_about.about)
         all_users_details.append({"id": participant.id,
                                   "first_name": participant.first_name,
                                   "last_name": participant.last_name,
                                   "user": participant.username,
                                   "phone": participant.phone,
-                                  "is_bot": participant.bot})
+                                  "is_bot": participant.bot
+                                  #"about": result_about.about
+                                  })
     print("Saving in file...")
 
     # Сохраняем и читаем JSON
     with open('channel_users.json', 'w', encoding="utf-8") as outfile:
         json.dump(all_users_details, outfile, indent=4, ensure_ascii=False)
-    print(f"{len(all_participants)} members  scraped successfully")
+    print(f"{len(all_participants)} members scraped successfully")
 
     with open("channel_users.json", encoding="utf-8") as file:
         all_users = json.load(file)
 
-    # Сохраняем и читаем CSV
+    # Создаем и заполняем CSV
     with open("channel_users.csv", "w", newline='') as file:
         writer = csv.writer(file, delimiter=";")
         writer.writerow(
@@ -77,6 +81,7 @@ async def dump_all_participants(channel):
                 "Username",
                 "Телефон",
                 "Бот/Не бот"
+                #"О себе"
             )
         )
         file.close()
@@ -91,10 +96,10 @@ async def dump_all_participants(channel):
                 participant["user"],
                 participant["phone"],
                 participant["is_bot"]
+                #participant["about"]
                 )
             )
         file.close()
-
 
 
 async def dump_all_messages(channel):
@@ -144,11 +149,9 @@ async def main():
     await dump_all_participants(channel)
 
 
-# await dump_all_messages(channel)
-
 # if __name__ == '__main__':
-# 	loop = asyncio.get_event_loop()
-# 	loop.run_until_complete(main())
+#     loop = asyncio.get_event_loop()
+#     loop.run_until_complete(main())
 
 
 with client:
